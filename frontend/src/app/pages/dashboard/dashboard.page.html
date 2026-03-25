@@ -1,0 +1,116 @@
+<ion-header>
+  <ion-toolbar color="dark">
+    <ion-title>Hybrid SIEM Dashboard</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="dashboard-container">
+    
+    <!-- TOP HEADER -->
+    <div class="stats-header">
+      <h2 style="font-family: var(--heading-font); font-weight: 700; letter-spacing: -0.5px; font-size: 1.8rem; margin-bottom: 24px;">
+        Security <span style="color: var(--accent-primary)">Nexus</span>
+      </h2>
+
+      <ion-grid class="ion-no-padding">
+        <ion-row>
+          <ion-col size="12" size-md="4">
+            <div class="stat-card health-card">
+              <h3>System Status</h3>
+              <div class="stat-value">SHIELD ACTIVE</div>
+              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">AI Monitoring Online</p>
+            </div>
+          </ion-col>
+          <ion-col size="12" size-md="4">
+            <div class="stat-card" [class.threat-active]="getThreatsCount() > 0">
+              <h3>Active Threats</h3>
+              <div class="stat-value">{{ getThreatsCount() }}</div>
+              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Detected in last 24h</p>
+            </div>
+          </ion-col>
+          <ion-col size="12" size-md="4">
+            <div class="stat-card">
+              <h3>Total Analysis</h3>
+              <div class="stat-value">{{ logs.length }}</div>
+              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Events Processed</p>
+            </div>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
+    </div>
+
+    <!-- ACTION BUTTON -->
+    <ion-button expand="block" class="btn-detect" (click)="runDetection()" [disabled]="isScanning">
+      <ion-icon *ngIf="!isScanning" name="scan-outline" slot="start"></ion-icon>
+      <ion-spinner *ngIf="isScanning" slot="start"></ion-spinner>
+      {{ isScanning ? 'Aggregating Neural Data...' : 'Initialize Neural Scan' }}
+    </ion-button>
+
+
+    <!-- EVENTS FEED -->
+    <div class="events-container">
+      <div class="table-header">
+        <ion-grid>
+          <ion-row>
+            <ion-col size="3">Timestamp</ion-col>
+            <ion-col size="4">Event Identifier</ion-col>
+            <ion-col size="2">Integrity</ion-col>
+            <ion-col size="3" class="ion-text-end">Operational Status</ion-col>
+          </ion-row>
+        </ion-grid>
+      </div>
+
+      <div class="events-body">
+        <ng-container *ngFor="let log of logs">
+          <div class="table-row" (click)="toggle(log)" style="cursor: pointer;">
+            <ion-grid>
+              <ion-row style="align-items: center;">
+                <ion-col size="3" style="font-family: monospace; opacity: 0.7; font-size: 0.85rem;">
+                  {{ log.time | date:'HH:mm:ss' }}
+                </ion-col>
+                <ion-col size="4" style="font-weight: 500;">
+                  {{ log.name }}
+                </ion-col>
+                <ion-col size="2">
+                  <span class="severity-badge" [ngClass]="log.severity">
+                    {{ log.severity }}
+                  </span>
+                </ion-col>
+                <ion-col size="3" class="ion-text-end">
+                  <span class="status-indicator" [ngClass]="log.status"></span>
+                  <span style="font-size: 0.8rem; text-transform: uppercase; font-weight: 600; opacity: 0.8;">
+                    {{ log.status }}
+                  </span>
+                </ion-col>
+              </ion-row>
+            </ion-grid>
+          </div>
+
+          <!-- DETAILED PANEL -->
+          <div *ngIf="log.open" class="details-panel">
+            <div class="detail-grid">
+              <div>
+                <b>Vector Origin</b>
+                <p>{{ log.description || 'Internal Network' }}</p>
+              </div>
+              <div>
+                <b>Protocol Stack</b>
+                <p>{{ log.protocol || 'TCP/IP Core' }}</p>
+              </div>
+              <div>
+                <b>Deep Analysis</b>
+                <p>Anomaly Score: {{ log.anomaly_score || '0.000' }}</p>
+              </div>
+              <div>
+                <b>Model Confidence</b>
+                <p>XGBoost: {{ log.xgb_prediction === 1 ? 'Threat' : 'Safe' }}</p>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+  </div>
+</ion-content>
