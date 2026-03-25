@@ -1,0 +1,37 @@
+Project Status and Remaining Tasks
+Checklist
+ Initial Project Setup
+ Data Cleaning & Preprocessing
+ Machine Learning Model Implementation
+ XGBoost Training
+ Autoencoder Implementation
+ Hybrid Detection Logic
+ Backend Development (Django)
+ Basic API structure
+ Real-time log ingestion integration
+ Database schema for alerts/logs
+ Frontend Development (Ionic/Angular)
+ Dashboard UI
+ Integration with Backend API
+ Real-time updates (WebSockets or Polling)
+ Testing & Validation
+ Unit tests for detection logic
+ Integration tests
+ Documentation
+ Architecture Diagram
+ API Documentation
+ User Guide / Viva Script
+
+
+ where to put dataset file
+ hybrid/Autoencoder/ae_train.csv
+ hybrid/Autoencoder/ae_test.csv
+  hybrid/Autoencoder/X_test_scaled.csv
+   hybrid/Autoencoder/y_test.csv
+ hybrid/XGBoost/X_test_scaled.csv
+ hybrid/XGBoost/X_train_scaled.csv
+  hybrid/XGBoost/y_train.csv
+   hybrid/XGBoost/y_test.csv
+
+   download the dataset from G-Drive
+   https://drive.google.com/drive/folders/1Cz2PQ6AJT__PB7lf6TO3t8I_xEFr9v3B?usp=sharing
