@@ -7,29 +7,34 @@ from detection.services import detect_anomaly
 
 @api_view(['POST'])
 def detect_log(request):
-    data = request.data
+    data = request.data.get('features') 
+    
+    # 💡 Fallback for testing integration: use sample features if none provided
+    if not data:
+        # Hardcoded sample row from X_test_scaled.csv (first row)
+        data = [-0.35784866632238554,-0.3643247547265954,-0.011071901431666448,-0.009483421590998464,-0.04659557501384222,-0.007065907520797916,-0.26545612988382405,-0.31527415761429045,-0.2956196044655256,-0.217057403734011,-0.382537216050906,-0.534456016659364,-0.4379851809789838,-0.3268811551772027,-0.0439244793692077,0.2189100602515715,-0.22627811856385277,-0.28116068079272427,-0.31007619408851833,-0.05332765649222234,-0.3549372591947804,-0.20524472381394238,-0.2764182957622004,-0.29812052323286736,-0.12002869591374003,-0.31971213597829745,-0.17793382867212543,-0.22873642867881805,-0.2530094631047525,-0.11736342170688807,-0.22403148988783378,0.0,-0.012143360717264785,0.0,0.0014792242382573454,0.0017718534609769663,0.008906474525276686,1.1923122469341747,-0.7073889607100159,-0.4045021420309822,-0.4963440368435379,-0.39258801104701085,-0.2238093165918448,-0.12371432589541884,-0.22403148988783378,-0.014674971789686816,1.4180168479001143,-0.6273995862794715,-0.3408077477370359,-0.012143360717264785,-0.014714804006730585,0.3859402910827421,-0.5102821221384631,-0.2956196044655256,-0.4379851809789817,0.0,0.0,0.0,0.0,0.0,0.0,-0.011071901431666448,-0.046669419781030244,-0.009483421590998464,-0.007065925941223854,1.4421164037006304,-0.2448866922830766,-0.008559550325970609,0.0028956949698831246,-0.1236417417769261,-0.10744361493089634,-0.1496064990132988,-0.09980702611248196,-0.2815685258908565,-0.11075648396991825,-0.28161176283366934,-0.263394598482789]
 
-    # 🔥 Run ML model
-    result = detect_anomaly(data)
+    # 🔥 Run ML model (Returns: result_str, xgb_pred, recon_error)
+    result_str, xgb_pred, recon_error = detect_anomaly(data)
 
-    # 🔥 Convert prediction → readable values
-    name = "Suspicious Activity" if result == 1 else "Normal Traffic"
-    severity = "high" if result == 1 else "low"
-
-    # 🔥 Save in DB (matching frontend UI)
+    # 🔥 Save in DB with correct fields
     log = Log.objects.create(
-        time=now(),
-        name=name,
-        severity=severity,
-        status="open"
+        source=request.data.get('source', 'windows'),
+        event_id=request.data.get('event_id'),
+        event_type="Hybrid Detection Scan",
+        anomaly_score=recon_error,
+        xgb_prediction=xgb_pred,
+        result=result_str
     )
+
 
     return Response({
         "message": "Detection complete",
         "log": {
-            "time": log.time,
-            "name": log.name,
-            "severity": log.severity,
-            "status": log.status
+            "time": log.timestamp,
+            "result": log.result,
+            "anomaly_score": log.anomaly_score,
+            "xgb_prediction": log.xgb_prediction,
+            "severity": "high" if (xgb_pred != 0 or recon_error > 0.01) else "low"
         }
-    })
+    })
