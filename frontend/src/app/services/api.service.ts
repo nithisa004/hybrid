@@ -9,11 +9,10 @@ export class ApiService {
 
     constructor(private http: HttpClient) { }
 
-    detect() {
-
-        return this.http.post(`${this.baseUrl}/detect/`, {});  // ✅ add /
-
+    detect(payload: any = {}) {
+        return this.http.post(`${this.baseUrl}/detect/`, payload);
     }
+
 
     // 🔥 NEW
     getLogs() {

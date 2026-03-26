@@ -1,0 +1,19 @@
+# Hybrid SIEM Project Requirements
+
+# Django Backend
+django
+djangorestframework
+django-cors-headers
+requests
+
+# Machine Learning
+xgboost
+tensorflow
+pandas
+numpy
+joblib
+scikit-learn
+
+# Real-Time Sensors
+scapy
+pywin32 

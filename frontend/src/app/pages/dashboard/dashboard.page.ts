@@ -3,7 +3,15 @@ import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { ApiService } from '../../services/api.service';
 import { addIcons } from 'ionicons';
-import { scanOutline, shieldCheckmarkOutline, bugOutline, listOutline } from 'ionicons/icons';
+import { 
+  scanOutline, 
+  shieldCheckmarkOutline, 
+  bugOutline, 
+  listOutline,
+  checkmarkCircle,
+  ellipse,
+  checkmark
+} from 'ionicons/icons';
 
 @Component({
   standalone: true,
@@ -18,7 +26,15 @@ export class DashboardPage implements OnInit {
   isScanning: boolean = false;
 
   constructor(private api: ApiService) {
-    addIcons({ scanOutline, shieldCheckmarkOutline, bugOutline, listOutline });
+    addIcons({ 
+      scanOutline, 
+      shieldCheckmarkOutline, 
+      bugOutline, 
+      listOutline,
+      checkmarkCircle,
+      ellipse,
+      checkmark
+    });
   }
 
   ngOnInit() {
@@ -26,7 +42,7 @@ export class DashboardPage implements OnInit {
   }
 
   getThreatsCount() {
-    return this.logs.filter(log => log.severity === 'high').length;
+    return this.logs.filter(log => log.severity.toLowerCase() === 'high').length;
   }
 
   loadLogs() {
@@ -45,7 +61,7 @@ export class DashboardPage implements OnInit {
 
   runDetection() {
     this.isScanning = true;
-    this.api.detect().subscribe(
+    this.api.detect({}).subscribe(
       () => {
         this.isScanning = false;
         this.loadLogs();

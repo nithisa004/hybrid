@@ -39,12 +39,12 @@ def detect_anomaly(data):
     recon = autoencoder_model.predict(x)
     recon_error = float(np.mean((x - recon) ** 2, axis=1)[0])
     
-    # Hybrid Logic
+    # Hybrid Logic (Reduced False Positives: Stricter Thresholds)
     if xgb_pred != 0:
         result = "Attack (Known)"
-    elif recon_error > threshold:
+    elif recon_error > threshold * 5.0:  # High threshold: only flag extreme anomalies
         result = "Anomaly (Unknown Attack)"
     else:
         result = "Normal"
         
-    return result, xgb_pred, recon_error
+    return result, xgb_pred, recon_error

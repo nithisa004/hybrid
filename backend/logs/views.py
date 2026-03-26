@@ -8,11 +8,22 @@ def get_logs(request):
 
     data = [
         {
-            "time": log.timestamp,  # ✅ map correctly
-            "name": log.event_type,  # ✅ rename for UI
-            "severity": "high" if log.xgb_prediction == 1 else "low",
-            "status": "open" if log.result == 1 else "closed",
-            "description": log.source,
+            "id": log.id,
+            "time": log.timestamp,
+            "name": log.name,
+            "severity": log.severity,
+            "status": log.status,
+            "verdict": log.verdict,
+            "assignee": log.assignee,
+            "description": log.description,
+            "host": log.host,
+            "process_name": log.process_name,
+            "process_user": log.process_user,
+            "target_file": log.target_file,
+            "file_md5": log.file_md5,
+            "anomaly_score": log.anomaly_score,
+            "xgb_prediction": log.xgb_prediction,
+            "result": log.result,
             "open": False
         }
         for log in logs
