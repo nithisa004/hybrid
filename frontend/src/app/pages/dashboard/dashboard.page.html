@@ -55,9 +55,9 @@
           <ion-row>
             <ion-col size="2">Time</ion-col>
             <ion-col size="3">Name</ion-col>
-            <ion-col size="1.5">Severity</ion-col>
+            <ion-col size="2">Severity</ion-col>
             <ion-col size="2">Status</ion-col>
-            <ion-col size="1.5">Verdict</ion-col>
+            <ion-col size="1">Verdict</ion-col>
             <ion-col size="2">Assignee</ion-col>
           </ion-row>
         </ion-grid>
@@ -69,12 +69,12 @@
             <ion-grid>
               <ion-row style="align-items: center;">
                 <ion-col size="2" class="col-time">
-                  {{ log.time | date:'MMM d, y at HH:mm' }}
+                  {{ log.time | date:'MMM d, y, HH:mm' }}
                 </ion-col>
                 <ion-col size="3" class="col-name">
                   {{ log.name }}
                 </ion-col>
-                <ion-col size="1.5">
+                <ion-col size="2">
                   <span class="severity-badge" [ngClass]="log.severity.toLowerCase()">
                     {{ log.severity }}
                   </span>
@@ -85,7 +85,7 @@
                     {{ log.status }}
                   </div>
                 </ion-col>
-                <ion-col size="1.5">
+                <ion-col size="1">
                   <div class="verdict-pill" [ngClass]="log.verdict.toLowerCase().replace(' ', '-')">
                      <ion-icon *ngIf="log.verdict !== 'None'" name="checkmark"></ion-icon>
                      {{ log.verdict }}
@@ -104,6 +104,14 @@
                <div class="full-width">
                  <label>Description:</label>
                  <p>{{ log.description }}</p>
+               </div>
+               <div class="full-width" style="margin-top: 8px;">
+                 <label>Predicted Threat Type:</label>
+                 <p style="font-weight: bold; font-family: var(--heading-font); letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;"
+                    [style.color]="log.severity === 'Low' || log.severity === 'Info' ? 'var(--ion-color-medium)' : 'var(--ion-color-danger)'">
+                   <ion-icon [name]="log.severity === 'Low' || log.severity === 'Info' ? 'information-circle-outline' : 'alert-circle-outline'"></ion-icon>
+                   {{ log.threat_type || 'Unknown Attack' }}
+                 </p>
                </div>
                <div>
                  <label>Host:</label>
@@ -129,6 +137,12 @@
                  <label>Anomaly Score:</label>
                  <p>{{ log.anomaly_score | number:'1.3-3' }}</p>
                </div>
+            </div>
+            <div class="action-bar" *ngIf="log.severity !== 'Low' && log.severity !== 'Info'" style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; display: flex; justify-content: flex-end;">
+              <ion-button color="danger" size="small" [disabled]="log.status === 'Blocked'" (click)="blockThreat(log, $event)">
+                 <ion-icon name="shield-half-outline" slot="start"></ion-icon>
+                 {{ log.status === 'Blocked' ? 'Threat Blocked' : 'Block Threat' }}
+              </ion-button>
             </div>
           </div>
         </ng-container>

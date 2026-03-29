@@ -1,8 +1,10 @@
 .dashboard-container {
   padding: 32px;
-  background: radial-gradient(circle at top right, rgba(0, 102, 255, 0.05), transparent),
+  background: radial-gradient(circle at top right, rgba(12, 153, 218, 0.05), transparent),
               radial-gradient(circle at bottom left, rgba(255, 0, 102, 0.05), transparent);
   min-height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .stats-header {
@@ -30,9 +32,11 @@
 
 .stat-value {
   font-family: var(--heading-font);
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   font-weight: 800;
   color: #fff;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
 }
 
 .stat-card.threat-active {
@@ -46,11 +50,12 @@
 
 .btn-detect {
   --background: var(--accent-primary);
+  --color: #000;
   --border-radius: 12px;
-  font-weight: 700;
+  font-weight: 800;
   height: 56px;
   margin-bottom: 48px;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   --box-shadow: 0 8px 16px rgba(0, 102, 255, 0.3);
 }
 
@@ -90,17 +95,20 @@
 }
 
 .col-time {
-  opacity: 0.6;
+  opacity: 0.8;
   font-size: 0.85rem;
+  color: #fff;
 }
 
 .col-name {
   font-weight: 600;
   letter-spacing: -0.2px;
+  color: #fff;
 }
 
 .col-assignee {
-  opacity: 0.8;
+  opacity: 0.85;
+  color: #fff;
 }
 
 // BADGES & PILLS
@@ -120,18 +128,36 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
     padding: 6px 12px;
     border-radius: 20px;
     width: fit-content;
     font-size: 0.8rem;
     font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     
     ion-icon { font-size: 10px; }
     
     &.closed {
         background: rgba(0, 255, 102, 0.1);
+        border-color: rgba(0, 255, 102, 0.3);
         color: #00ff66;
+    }
+    &.monitoring {
+        background: rgba(0, 210, 255, 0.1);
+        border-color: rgba(0, 210, 255, 0.3);
+        color: #00d2ff;
+    }
+    &.awaiting-action {
+        background: rgba(255, 184, 0, 0.1);
+        border-color: rgba(255, 184, 0, 0.3);
+        color: #ffb800;
+    }
+    &.blocked {
+        background: rgba(255, 0, 85, 0.1);
+        border-color: rgba(255, 0, 85, 0.3);
+        color: #ff0055;
     }
 }
 
@@ -141,12 +167,27 @@
     gap: 4px;
     font-size: 0.8rem;
     font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    width: fit-content;
     
+    &.none {
+        color: rgba(255, 255, 255, 0.4);
+        background: transparent;
+        border-color: transparent;
+    }
     &.true-positive {
         color: #00ff66;
         background: rgba(0, 255, 102, 0.1);
-        padding: 4px 10px;
-        border-radius: 12px;
+        border-color: rgba(0, 255, 102, 0.2);
+    }
+    &.false-positive {
+        color: #ffb800;
+        background: rgba(255, 184, 0, 0.1);
+        border-color: rgba(255, 184, 0, 0.2);
     }
 }
 
