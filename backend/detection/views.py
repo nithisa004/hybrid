@@ -1,198 +1,174 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from logs.models import Log
-from detection.services import detect_anomaly
-import random
-import os
-import pandas as pd
-from django.conf import settings
+import win32evtlog
+from collections import Counter
+import socket
+import datetime
+from .alerts import send_threat_alert
 
+# ============================================================
+# 🧱 SECURITY RULE ENGINE — 15+ Attack Pattern Rules
+# ML folder is preserved and untouched. Detection is rule-based only.
+# ============================================================
 
-# 🎯 Threat Intelligence Mappings
-THREAT_DESCRIPTIONS = {
-    # Event ID -> (threat_name, threat_description, mitigation)
-    4625: {
-        "threat_name": "Failed Authentication Attempt",
-        "description": "Multiple failed login attempts detected. This could indicate a brute-force attack on user credentials. Mitigate by implementing account lockout policies and monitoring for patterns.",
-        "indicators": "High volume of authentication failures from same source IP or targeting same user account"
-    },
-    4648: {
-        "threat_name": "Suspicious Credential Usage",
-        "description": "Explicit credential usage detected outside normal patterns. This may indicate credential theft or unauthorized service account usage. Monitor for access from non-standard locations.",
-        "indicators": "Service account or admin credentials used from unexpected system or at unusual time"
-    },
-    4672: {
-        "threat_name": "Privilege Escalation Attempt",
-        "description": "Higher-than-normal privilege assignment or elevation detected. Potential privilege escalation attack where attacker attempts to gain admin rights. Verify if this was authorized.",
-        "indicators": "Unexpected admin privilege assignment or UAC bypass patterns"
-    },
-    4720: {
-        "threat_name": "Unauthorized Account Creation",
-        "description": "New user account created outside of normal administrative processes. Attackers often create backdoor accounts for persistence. Verify this account creation was authorized.",
-        "indicators": "Account created at unusual time, with suspicious naming patterns, or by unexpected administrative user"
-    },
-    4688: {
-        "threat_name": "Suspicious Process Execution",
-        "description": "Process execution detected with characteristics of malware or exploitation. Common in ransomware, command-and-control, or privilege escalation attacks. Analyze process binary origin and parent process.",
-        "indicators": "Parent-child process relationships, process memory injection, or binary execution from temp directories"
-    }
+# Rule: EventID -> (Rule Name, Description, Severity)
+WINDOWS_RULES = {
+    4625:  ("Brute Force - Failed Login",       "Failed logon attempt detected. Rule: 5+ failures = Brute Force attack.", "High"),
+    1102:  ("Anti-Forensics - Audit Log Cleared","Security audit log was cleared. Classic attacker anti-forensics move.", "Critical"),
+    104:   ("Anti-Forensics - System Log Cleared","System log was wiped. Potential attempt to destroy evidence.", "High"),
+    7045:  ("Persistence - New Service Installed","A new Windows service was installed. Common malware persistence technique.", "High"),
+    4720:  ("Persistence - New Account Created",  "A new user account was created. Attackers create backdoor accounts for re-entry.", "High"),
+    4728:  ("Privilege Escalation - Group Member Added", "A user was added to a privileged security group. Verify authorization.", "High"),
+    4732:  ("Privilege Escalation - Local Group Change", "A member was added to a local security-enabled group.", "High"),
+    4672:  ("Privilege Escalation - Special Privileges", "Special privileges assigned to new logon. Potential UAC bypass.", "High"),
+    4740:  ("Account Locked Out",                "A user account was locked out. Sign of targeted brute force attack.", "Medium"),
+    6008:  ("System Instability - Unexpected Shutdown", "System shut down unexpectedly. Could be DoS, crash, or physical attack.", "Medium"),
+    7000:  ("Critical Service Failure",           "A critical Windows service failed to start. Investigate potential disruption.", "Medium"),
+    7001:  ("Service Dependency Failure",         "A service failed because of a dependent service failure.", "Medium"),
+    2013:  ("Resource Exhaustion - Disk Full",    "Disk space critically low. Potential Denial of Service via log flooding.", "Medium"),
+    29:    ("Infrastructure - Time Sync Failure", "System time sync failed. Potential NTP-based protocol attack or MITM.", "Medium"),
+    35:    ("Infrastructure - Time Sync Warning", "NTP time sync source is unverified.", "Low"),
+    2004:  ("Firewall Rule Modified",             "A rule was added to Windows Firewall. Verify this was authorized.", "Medium"),
+    6:     ("Code Integrity - Driver Blocked",    "A driver was blocked from loading by Windows Code Integrity. Possible rootkit.", "High"),
+    106:   ("Persistence - Scheduled Task Created","A scheduled task was registered. Common persistence and lateral movement mechanism.", "Medium"),
 }
 
-NETWORK_THREAT_DESCRIPTIONS = {
-    "Network Traffic Scan": {
-        "threat_name": "Network Reconnaissance/Port Scan",
-        "description": "Unusual network traffic patterns detected suggesting port scanning or network reconnaissance. Attacker is mapping network to identify vulnerable services. This is typically Phase 1 of a multi-stage attack.",
-        "indicators": "High volume of connection attempts to diverse ports, unusual packet sizes, or traffic from external IP addresses"
-    },
-    "Network Traffic Exploit": {
-        "threat_name": "Network-Based Exploitation Attempt",
-        "description": "Network traffic contains signatures matching known exploit patterns. This indicates active attack attempting to compromise systems via network services.",
-        "indicators": "Buffer overflow patterns, SQL injection payloads, or shellcode detected in network traffic"
-    },
-    "DNS Query Anomaly": {
-        "threat_name": "DNS Exfiltration / C2 Communication",
-        "description": "Suspicious DNS query patterns detected. May indicate data exfiltration via DNS tunneling or command-and-control communication with attacker infrastructure.",
-        "indicators": "Queries to suspicious domains, excessive subdomain queries, or unusual query frequency"
-    }
-}
 
-def get_threat_description(event_type, event_id, source, result_str, recon_error):
-    """Generate detailed threat description based on detection context"""
-    
-    # Default response
-    threat_name = "Security Event"
-    threat_desc = ""
-    indicators = ""
-    
-    # For Windows OS events
-    if event_id in THREAT_DESCRIPTIONS:
-        threat = THREAT_DESCRIPTIONS[event_id]
-        threat_name = threat["threat_name"]
-        threat_desc = threat["description"]
-        indicators = threat["indicators"]
-    
-    # For Network-based events
-    elif "Network" in source:
-        if event_type in NETWORK_THREAT_DESCRIPTIONS:
-            threat = NETWORK_THREAT_DESCRIPTIONS[event_type]
-            threat_name = threat["threat_name"]
-            threat_desc = threat["description"]
-            indicators = threat["indicators"]
-        else:
-            threat_name = "Network Security Event"
-            threat_desc = f"Unusual network pattern detected: {event_type}. Requires further investigation for malicious intent."
-            indicators = "Traffic volume, protocol patterns, source/destination IPs, payload content"
-    
-    # Append confidence and ML analysis
-    confidence = max(0, (1 - recon_error) * 100)
-    
-    full_description = f"""
-THREAT: {threat_name}
+def get_hostname():
+    try:
+        return socket.gethostname()
+    except:
+        return "LOCALHOST"
 
-ANALYSIS:
-{threat_desc}
 
-DETECTION DETAILS:
-• Source: {source}
-• Event Type: {event_type}
-• ML Classification: {result_str}
-• Confidence Score: {confidence:.1f}%
-• Anomaly Score: {recon_error:.4f}
-
-KEY INDICATORS:
-{indicators}
-
-ACTION REQUIRED:
-1. Review detailed logs for timing and context
-2. Check source IP address geolocation and reputation
-3. Verify if activity was authorized
-4. If confirmed threat: isolate system and initiate incident response
-5. Preserve evidence for forensic analysis
-    """.strip()
-    
-    return full_description.strip()
+def read_event_log(log_name, batch_size=100):
+    """Safely read a Windows event log. Returns empty list on access error."""
+    try:
+        hand = win32evtlog.OpenEventLog(None, log_name)
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+        return win32evtlog.ReadEventLog(hand, flags, 0)[:batch_size]
+    except Exception:
+        return []
 
 
 @api_view(['POST'])
 def detect_log(request):
-    features = request.data.get('features') 
-    source = request.data.get('source', 'windows')
-    event_id = request.data.get('event_id')
-    event_type = request.data.get('event_type', 'Hybrid Detection Scan')
-    
-    # 💡 Fallback for testing integration: use sample features if none provided
-    if not features:
-        sample_file = os.path.join(settings.BASE_DIR, '..', 'XGboost', 'sample_row.csv')
-        if os.path.exists(sample_file):
-            features = pd.read_csv(sample_file).iloc[0].tolist()
-        else:
-            features = [-0.35] * 77
+    hostname = get_hostname()
 
-    # 🔥 Run ML model (Returns: result_str, xgb_pred, recon_error)
-    result_str, xgb_pred, recon_error = detect_anomaly(features)
+    # ── Step 1: Read Windows Event Logs ─────────────────────────────
+    system_events  = read_event_log('System',   100)
+    security_events = read_event_log('Security', 100)
+    all_events = system_events + security_events
 
-    # Determine Severity (Stricter Thresholds to Reduce False Positives)
-    severity = "Info"
-    if result_str == "Normal":
-        severity = "Info"
-    elif result_str == "Anomaly (Unknown Attack)":
-        # Only elevate to Medium if reconstruction error is significant
-        severity = "Medium" if recon_error > 0.1 else "Low"
-    elif result_str == "Attack (Known)":
-        # High severity only for confirmed XGBoost attacks
-        severity = "High"
+    if not all_events:
+        return Response({"message": "No events read (try running as Administrator for Security log access).", "threats": 0})
 
-    # 🔥 Filter: Skip storing low and medium confidence events (only High severity and confirmed attacks)
-    # This prevents legitimate activity from polluting the dashboard
-    if severity in ["Info", "Low", "Medium"]:
-        return Response({
-            "message": "Low confidence activity - not logged",
-            "log": {
-                "result": result_str,
-                "severity": severity,
-                "anomaly_score": recon_error,
-                "xgb_prediction": xgb_pred
-            }
-        })
+    # ── Step 2: Aggregate for Pattern Analysis ───────────────────────
+    event_id_counts = Counter([e.EventID & 0xFFFF for e in all_events])
+    source_counts   = Counter([e.SourceName or "Unknown" for e in all_events])
 
-    # 🎯 Generate detailed threat intelligence description
-    detailed_description = get_threat_description(event_type, event_id, source, result_str, recon_error)
+    processed_logs = []
+    seen_keys = set()
 
-    # 🔥 Save in DB with correct fields (only for suspicious/anomalous events)
-    log = Log.objects.create(
-        name=event_type,
-        severity=severity,
-        status="Awaiting action" if severity == "High" else "Monitoring",
-        verdict="None",
-        assignee="System AI" if severity == "High" else "Auto-Monitor",
-        source=source,
-        event_id=event_id,
-        description=detailed_description,
-        host=f"LPT-HR-{random.randint(100, 999)}",
-        process_name="chrome.exe" if "Network" in source.lower() else "powershell.exe",
-        process_user="S.Conway" if "Network" in source.lower() else "SYSTEM",
-        target_file="C:\\Users\\S.Conway\\Downloads\\patch.exe" if severity == "High" else "N/A",
-        file_md5="14d8486f3f63875ef93cfd240c5dc10b" if severity == "High" else "N/A",
-        anomaly_score=recon_error,
-        xgb_prediction=xgb_pred,
-        result=result_str
-    )
+    for evt in all_events:
+        event_id   = evt.EventID & 0xFFFF
+        source     = evt.SourceName or "Windows System"
+        key        = (event_id, source)
+
+        if key in seen_keys:
+            continue
+
+        count          = event_id_counts[event_id]
+        src_frequency  = source_counts[source]
+        is_threat      = False
+        rule_name      = ""
+        description    = ""
+        threat_type    = ""
+        severity       = "Info"
+
+        # ── RULE 1: Brute Force (5+ failed logins in batch) ──────────
+        if event_id == 4625:
+            if count >= 5:
+                is_threat   = True
+                rule_name   = "Brute Force Attack"
+                threat_type = "Credential Attack"
+                severity    = "High"
+                description = f"BRUTE FORCE DETECTED\n\nDetected {count} failed login attempts (Event ID 4625). This volume indicates an automated attack."
+            else:
+                is_threat   = False
+                rule_name   = "Failed Login Attempt"
+                threat_type = "System Activity"
+                severity    = "Info"
+                description = f"A failed login attempt was recorded for source: {source}."
+
+        # ── RULE 2: DoS Pattern (10+ events from single source) ──────
+        elif src_frequency >= 10 and event_id not in WINDOWS_RULES:
+            is_threat   = True
+            rule_name   = "Denial of Service Pattern"
+            threat_type = "DoS / Flood"
+            severity    = "High"
+            description = f"DoS PATTERN DETECTED\n\nSource '{source}' generated {src_frequency} events in the current window."
+
+        # ── RULE 3: Specific Windows Security Event IDs ───────────
+        elif event_id in WINDOWS_RULES:
+            r_name, r_desc, r_sev = WINDOWS_RULES[event_id]
+            
+            # Decide if it's a "Threat" or just "Activity"
+            # Routine IDs (Privileges, Processes, User Creation) are 'Info' unless flagged otherwise
+            if event_id in [4672, 4688, 4732, 4720]:
+                is_threat   = False
+                severity    = "Info"
+            else:
+                is_threat   = True
+                severity    = r_sev
+            
+            rule_name   = r_name
+            threat_type = r_name
+            description = f"SECURITY RULE TRIGGERED: {r_name}\n\n{r_desc}"
+
+        # ── RULE 4: Sensor-Specific Network Events ──────────────────
+        elif source.startswith("Network"):
+            is_threat   = False
+            rule_name   = "Network Activity Detected"
+            threat_type = "Network Flow"
+            severity    = "Info"
+            description = f"Network traffic was observed from source: {source}."
+
+        # ── Step 3: Save to Database ─────────────────────────────────
+        # We save ALL events. Threats stay forever, Info logs are capped.
+        final_name = f"[{severity}] {rule_name}" if is_threat else f"Activity: {rule_name if rule_name else source}"
+        
+        log = Log.objects.create(
+            name        = final_name,
+            severity    = severity,
+            status      = "Awaiting action" if severity in ["High", "Critical"] else "Monitoring",
+            verdict     = "None",
+            assignee    = "Rule Engine" if severity in ["High", "Critical"] else "Auto-Monitor",
+            source      = source,
+            event_id    = event_id,
+            description = description,
+            threat_type = threat_type,
+            host        = hostname,
+            process_name = source,
+            process_user = "SYSTEM",
+            result      = rule_name if is_threat else "Normal",
+        )
+        
+        processed_logs.append(log)
+        seen_keys.add(key)
+        
+        if is_threat:
+            send_threat_alert(log)
+
+    # ── Step 4: Maintenance ───
+    # Keep Info logs light
+    info_ids = Log.objects.filter(severity='Info').values_list('id', flat=True).order_by('-timestamp')[100:]
+    if info_ids:
+        Log.objects.filter(id__in=info_ids).delete()
 
     return Response({
-        "message": "Detection complete",
-        "log": {
-            "id": log.id,
-            "time": log.timestamp,
-            "name": log.name,
-            "severity": log.severity,
-            "status": log.status,
-            "verdict": log.verdict,
-            "assignee": log.assignee,
-            "result": log.result,
-            "host": log.host,
-            "process_name": log.process_name,
-            "description": log.description,
-            "anomaly_score": log.anomaly_score,
-            "xgb_prediction": log.xgb_prediction
-        }
+        "message": f"Processed {len(processed_logs)} events. {sum(1 for l in processed_logs if l.severity != 'Info')} threats found.",
+        "threats_found": sum(1 for l in processed_logs if l.severity != 'Info'),
+        "log": {"id": processed_logs[0].id if processed_logs else 0}
     })

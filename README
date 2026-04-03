@@ -35,3 +35,23 @@ Checklist
 
    download the dataset from G-Drive
    https://drive.google.com/drive/folders/1Cz2PQ6AJT__PB7lf6TO3t8I_xEFr9v3B?usp=sharing
+
+   Command	Action
+py simulate_attacks.py bruteforce	Simulates a Brute Force login attack (10 failed attempts)
+py simulate_attacks.py dos	Simulates a Denial of Service (DoS) flood
+py simulate_attacks.py logclear	Simulates an Anti-Forensics event (Security log cleared)
+py simulate_attacks.py persistence	Simulates a Malware Persistence attempt (New Service + Task)
+py simulate_attacks.py all	Runs all attack simulations sequentially
+
+To check firewall rules:
+
+Step-by-Step Verification:
+Check existing rules (to see what's there):
+powershell
+netsh advfirewall firewall show rule name=all | findstr HybridSIEM
+Run the removal command (PowerShell Admin):
+powershell
+Get-NetFirewallRule -DisplayName "HybridSIEM_Block_*" | Remove-NetFirewallRule
+Check again (it should now be empty):
+powershell
+netsh advfirewall firewall show rule name=all | findstr HybridSIEM

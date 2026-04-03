@@ -27,7 +27,8 @@ def process_packet(packet_features):
         "source": f"Network ({packet_features.get('src_ip', 'local')})",
         "event_id": packet_features.get('protocol', 0),
         "event_type": "Network Traffic Scan",
-        "features": ml_features
+        "features": ml_features,
+        "FromSensor": True
     }
     
     try:
@@ -54,7 +55,17 @@ important_events = {
 }
 
 while True:
-    events = win32evtlog.ReadEventLog(handle, flags, 0)
+    try:
+        events = win32evtlog.ReadEventLog(handle, flags, 0)
+    except Exception as e:
+        print(f"⚠️ Event Log Error: {e}. Re-opening...")
+        time.sleep(2)
+        try:
+            handle = win32evtlog.OpenEventLog(server, log_type)
+            continue
+        except:
+            continue
+
     if events:
         for event in events:
             event_id = event.EventID & 0xFFFF
@@ -67,7 +78,8 @@ while True:
                     "source": "Windows OS",
                     "event_id": event_id,
                     "event_type": event_name,
-                    "features": features
+                    "features": features,
+                    "FromSensor": True
                 }
                 
                 try:

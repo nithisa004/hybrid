@@ -31,11 +31,7 @@ You have two options to feed data to your SIEM from the `detection` folder:
     cd d:\hybrid\detection
     py .\realtime_detection.py
     ```
-*   **Option B: OS Log Sensor (Windows Logs Only)**
-    *Best for system-specific monitoring.*
-    ```powershell
-    cd d:\hybrid\detection
-    py .\os_log_ingester.py
+*  
     ```
 
 
@@ -43,5 +39,5 @@ You have two options to feed data to your SIEM from the `detection` folder:
 If you want to manually test the detection logic without waiting for real events, run this in any terminal:
 ```powershell
 cd d:\hybrid
-python simulate_attacks.py
+py simulate_attacks.py
 ```

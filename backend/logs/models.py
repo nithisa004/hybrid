@@ -14,6 +14,7 @@ class Log(models.Model):
     source = models.CharField(max_length=50, default='windows')
     event_id = models.IntegerField(null=True, blank=True)
     description = models.TextField(blank=True, default='')
+    threat_type = models.CharField(max_length=150, default='Unknown Attack')
     host = models.CharField(max_length=100, default='LPT-HR-001')
     process_name = models.CharField(max_length=100, default='system.exe')
     process_user = models.CharField(max_length=100, default='SYSTEM')

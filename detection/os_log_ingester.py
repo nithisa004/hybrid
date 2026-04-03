@@ -30,32 +30,43 @@ important_events = {
 }
 
 while True:
-    events = win32evtlog.ReadEventLog(handle, flags, 0)
+    try:
+        events = win32evtlog.ReadEventLog(handle, flags, 0)
+    except Exception as e:
+        # Handle RPC error 1726 or stale handles
+        print(f"⚠️ Event Log Error: {e}. Re-opening handle...")
+        time.sleep(2)
+        try:
+            handle = win32evtlog.OpenEventLog(server, log_type)
+            continue
+        except:
+            continue
+
     if events:
         for event in events:
-            event_id = event.EventID
+            event_id = event.EventID & 0xFFFF # Use bitmask for correct ID
             if event_id in important_events:
                 event_name, features = important_events[event_id]
                 
                 print(f"Detected: {event_name} (ID: {event_id})")
                 
-                # Send to Backend
+                # Send to Backend - All detected events go to the unified /detect/ endpoint
                 payload = {
-                    "source": "Windows Event Log",
+                    "source": f"Windows {log_type}",
                     "event_id": event_id,
                     "event_type": event_name,
-                    "features": features
+                    "features": features,
+                    "FromSensor": True
                 }
                 
                 try:
-                    res = requests.post(API_URL, json=payload)
+                    res = requests.post(API_URL, json=payload, timeout=2)
                     if res.status_code == 200:
-                        analysis = res.json()['log']
-                        print(f"Analysis: {analysis['result']} | XGBoost: {analysis['xgb_prediction']} | AE Score: {analysis['anomaly_score']:.4f}")
+                        print(f"✅ Log forwarded to SIEM")
                     else:
-                        print(f"API Error: {res.status_code}")
+                        print(f"❌ API Error: {res.status_code}")
                 except Exception as e:
-                    print(f"Connection to backend failed: {e}")
+                    print(f"📡 Connection to backend failed: {e}")
                 
                 print("-" * 50)
     time.sleep(1) # Interval to prevent CPU spike

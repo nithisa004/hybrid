@@ -6,4 +6,5 @@ urlpatterns = [
 
     path('logs/', include('logs.urls')),         # ✅
     path('detect/', include('detection.urls')),  # ✅
+    path('simulate/', include('logs.sim_urls')), # ✅
 ]

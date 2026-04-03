@@ -6,148 +6,206 @@
 
 <ion-content>
   <div class="dashboard-container">
-    
-    <!-- TOP HEADER -->
+
+    <!-- TOP STAT CARDS -->
     <div class="stats-header">
-      <h2 style="font-family: var(--heading-font); font-weight: 700; letter-spacing: -0.5px; font-size: 1.8rem; margin-bottom: 24px;">
-        Security <span style="color: var(--accent-primary)">Nexus</span>
-      </h2>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px;">
+        <h2 style="font-family: var(--heading-font); font-weight: 700; letter-spacing: -0.5px; font-size: 1.8rem; margin: 0;">
+          Security <span style="color: var(--accent-primary)">Nexus</span>
+        </h2>
+
+        <ion-button fill="outline" size="small" color="primary" (click)="generateReport()" style="--border-radius: 8px; font-weight: 600; text-transform: none; letter-spacing: 0;">
+          <ion-icon name="document-text-outline" slot="start"></ion-icon>
+          Weekly Report (PDF)
+        </ion-button>
+      </div>
 
       <ion-grid class="ion-no-padding">
         <ion-row>
-          <ion-col size="12" size-md="4">
+          <ion-col size="4">
             <div class="stat-card health-card">
               <h3>System Status</h3>
               <div class="stat-value">SHIELD ACTIVE</div>
               <p style="margin:0; font-size: 0.8rem; opacity: 0.6">AI Monitoring Online</p>
             </div>
           </ion-col>
-          <ion-col size="12" size-md="4">
+          <ion-col size="4">
             <div class="stat-card" [class.threat-active]="getThreatsCount() > 0">
               <h3>Active Threats</h3>
               <div class="stat-value">{{ getThreatsCount() }}</div>
-              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Detected in last 24h</p>
+              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Detected This Session</p>
             </div>
           </ion-col>
-          <ion-col size="12" size-md="4">
-            <div class="stat-card">
-              <h3>Total Analysis</h3>
-              <div class="stat-value">{{ logs.length }}</div>
-              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Events Processed</p>
+          <ion-col size="4">
+            <div class="stat-card event-card">
+              <h3>Total Events</h3>
+              <div class="stat-value">{{ getTotalEventsCount() }}</div>
+              <p style="margin:0; font-size: 0.8rem; opacity: 0.6">Logged This Session</p>
             </div>
           </ion-col>
         </ion-row>
       </ion-grid>
     </div>
 
-    <!-- ACTION BUTTON -->
-    <ion-button expand="block" class="btn-detect" (click)="runDetection()" [disabled]="isScanning">
-      <ion-icon *ngIf="!isScanning" name="scan-outline" slot="start"></ion-icon>
-      <ion-spinner *ngIf="isScanning" slot="start"></ion-spinner>
-      {{ isScanning ? 'Aggregating Neural Data...' : 'Initialize Neural Scan' }}
-    </ion-button>
+    <!-- ✅ LIVE STATUS BAR (MODIFIED) -->
+    <div class="live-status-bar" [style.background]="isPaused ? 'rgba(255,184,0,0.06)' : 'rgba(0, 210, 255, 0.06)'"
+                                 [style.borderColor]="isPaused ? 'rgba(255,184,0,0.2)' : 'rgba(0, 210, 255, 0.2)'">
+      <div class="live-dot" [class.scanning]="isScanning && !isPaused" 
+                            [style.background]="isPaused ? '#ffb800' : '#00d2ff'"
+                            [style.boxShadow]="isPaused ? 'none' : '0 0 10px #00d2ff'"></div>
+      <span class="live-label" [style.color]="isPaused ? '#ffb800' : 'rgba(255,255,255,0.8)'">
+        {{ isPaused ? 'Monitoring Paused — Click Resume to start scanning' : 
+          (isScanning ? 'Deep Scanning Windows & Network Logs...' : 'Live Monitoring Active — Auto-Scan Every 5s') }}
+      </span>
+      
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span class="live-badge" [class.scanning-badge]="isScanning && !isPaused"
+                                [style.background]="isPaused ? 'rgba(255,184,0,0.12)' : ''"
+                                [style.borderColor]="isPaused ? 'rgba(255,184,0,0.3)' : ''"
+                                [style.color]="isPaused ? '#ffb800' : ''">
+          {{ isPaused ? 'PAUSED' : (isScanning ? 'SCANNING' : 'LIVE') }}
+        </span>
 
-
-    <!-- EVENTS FEED -->
-    <div class="events-container">
-      <div class="table-header">
-        <ion-grid>
-          <ion-row>
-            <ion-col size="2">Time</ion-col>
-            <ion-col size="3">Name</ion-col>
-            <ion-col size="2">Severity</ion-col>
-            <ion-col size="2">Status</ion-col>
-            <ion-col size="1">Verdict</ion-col>
-            <ion-col size="2">Assignee</ion-col>
-          </ion-row>
-        </ion-grid>
-      </div>
-
-      <div class="events-body">
-        <ng-container *ngFor="let log of logs">
-          <div class="table-row" (click)="toggle(log)" [class.active]="log.active">
-            <ion-grid>
-              <ion-row style="align-items: center;">
-                <ion-col size="2" class="col-time">
-                  {{ log.time | date:'MMM d, y, HH:mm' }}
-                </ion-col>
-                <ion-col size="3" class="col-name">
-                  {{ log.name }}
-                </ion-col>
-                <ion-col size="2">
-                  <span class="severity-badge" [ngClass]="log.severity.toLowerCase()">
-                    {{ log.severity }}
-                  </span>
-                </ion-col>
-                <ion-col size="2">
-                  <div class="status-pill" [ngClass]="log.status.toLowerCase().replace(' ', '-')">
-                    <ion-icon [name]="log.status.toLowerCase().includes('closed') ? 'checkmark-circle' : 'ellipse'"></ion-icon>
-                    {{ log.status }}
-                  </div>
-                </ion-col>
-                <ion-col size="1">
-                  <div class="verdict-pill" [ngClass]="log.verdict.toLowerCase().replace(' ', '-')">
-                     <ion-icon *ngIf="log.verdict !== 'None'" name="checkmark"></ion-icon>
-                     {{ log.verdict }}
-                  </div>
-                </ion-col>
-                <ion-col size="2" class="col-assignee">
-                  {{ log.assignee }}
-                </ion-col>
-              </ion-row>
-            </ion-grid>
-          </div>
-
-          <!-- FORENSIC PANEL -->
-          <div *ngIf="log.open" class="details-panel forensic-panel">
-            <div class="forensic-grid">
-               <div class="full-width">
-                 <label>Description:</label>
-                 <p>{{ log.description }}</p>
-               </div>
-               <div class="full-width" style="margin-top: 8px;">
-                 <label>Predicted Threat Type:</label>
-                 <p style="font-weight: bold; font-family: var(--heading-font); letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;"
-                    [style.color]="log.severity === 'Low' || log.severity === 'Info' ? 'var(--ion-color-medium)' : 'var(--ion-color-danger)'">
-                   <ion-icon [name]="log.severity === 'Low' || log.severity === 'Info' ? 'information-circle-outline' : 'alert-circle-outline'"></ion-icon>
-                   {{ log.threat_type || 'Unknown Attack' }}
-                 </p>
-               </div>
-               <div>
-                 <label>Host:</label>
-                 <p class="mono">{{ log.host }}</p>
-               </div>
-               <div>
-                 <label>Process Name:</label>
-                 <p class="mono">{{ log.process_name }}</p>
-               </div>
-               <div>
-                 <label>Process User:</label>
-                 <p>{{ log.process_user }}</p>
-               </div>
-               <div>
-                 <label>Target File:</label>
-                 <p class="mono">{{ log.target_file }}</p>
-               </div>
-               <div>
-                 <label>File MD5:</label>
-                 <p class="mono highlight">{{ log.file_md5 }}</p>
-               </div>
-               <div>
-                 <label>Anomaly Score:</label>
-                 <p>{{ log.anomaly_score | number:'1.3-3' }}</p>
-               </div>
-            </div>
-            <div class="action-bar" *ngIf="log.severity !== 'Low' && log.severity !== 'Info'" style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; display: flex; justify-content: flex-end;">
-              <ion-button color="danger" size="small" [disabled]="log.status === 'Blocked'" (click)="blockThreat(log, $event)">
-                 <ion-icon name="shield-half-outline" slot="start"></ion-icon>
-                 {{ log.status === 'Blocked' ? 'Threat Blocked' : 'Block Threat' }}
-              </ion-button>
-            </div>
-          </div>
-        </ng-container>
+        <ion-button fill="clear" size="small" (click)="togglePause()" class="pause-btn">
+          <ion-icon [name]="isPaused ? 'play-outline' : 'pause-outline'" slot="icon-only"></ion-icon>
+        </ion-button>
       </div>
     </div>
 
+    <div class="dual-log-container">
+      <!-- 🚩 THREAT INTELLIGENCE (LEFT) -->
+      <div class="log-section threat-section">
+        <div class="section-title">
+          <ion-icon name="bug-outline"></ion-icon>
+          Threat Intelligence
+        </div>
+        
+        <div class="events-container">
+          <div class="table-header">
+            <ion-row>
+              <ion-col size="3">Time</ion-col>
+              <ion-col size="4">Threat Name</ion-col>
+              <ion-col size="2">Severity</ion-col>
+              <ion-col size="3">Action</ion-col>
+            </ion-row>
+          </div>
+
+          <div class="events-body">
+            <div *ngIf="threatLogs.length === 0" class="empty-state">
+              <div class="empty-icon">✓</div>
+              <p>No threats detected</p>
+            </div>
+
+            <ng-container *ngFor="let log of threatLogs">
+              <div class="table-row threat-row" (click)="toggle(log)" [class.active]="log.open">
+                <ion-row style="align-items: center;">
+                  <ion-col size="3" class="col-time">{{ log.time | date:'HH:mm:ss' }}</ion-col>
+                  <ion-col size="4" class="col-name">{{ log.name.replace('[High] ', '').replace('[Critical] ', '') }}</ion-col>
+                  <ion-col size="2">
+                    <span class="severity-badge" [ngClass]="log.severity.toLowerCase()">{{ log.severity }}</span>
+                  </ion-col>
+                  <ion-col size="3">
+                    <span class="severity-badge" [ngClass]="log.status.toLowerCase().replace(' ', '-')">{{ log.status }}</span>
+                  </ion-col>
+                </ion-row>
+              </div>
+
+              <!-- FULL FORENSIC DETAILS (RESTORED) -->
+              <div *ngIf="log.open" class="details-panel forensic-panel">
+                <div class="forensic-grid">
+                   <div class="full-width">
+                     <label>Description:</label>
+                     <p style="white-space: pre-line;">{{ log.description }}</p>
+                   </div>
+                   <div class="full-width" style="margin-top: 8px;">
+                     <label>Detected Threat Type:</label>
+                     <p [style.color]="'var(--ion-color-danger)'"
+                        style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                       <ion-icon name="alert-circle-outline"></ion-icon>
+                       {{ log.threat_type || 'Unknown Attack' }}
+                     </p>
+                   </div>
+                   <div>
+                     <label>Host:</label>
+                     <p class="mono">{{ log.host }}</p>
+                   </div>
+                   <div>
+                     <label>Process Name:</label>
+                     <p class="mono">{{ log.process_name }}</p>
+                   </div>
+                   <div>
+                     <label>Event ID:</label>
+                     <p>{{ log.event_id }}</p>
+                   </div>
+                   <div>
+                     <label>Source:</label>
+                     <p>{{ log.assignee || 'Rule Engine' }}</p>
+                   </div>
+                   <div>
+                     <label>Anomaly Score:</label>
+                     <p>{{ log.anomaly_score | number:'1.3-3' }}</p>
+                   </div>
+                   <div>
+                     <label>File MD5:</label>
+                     <p class="mono highlight">{{ log.file_md5 }}</p>
+                   </div>
+                </div>
+                <!-- Block Threat button -->
+                <div class="action-bar" style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; display: flex; justify-content: flex-end;">
+                  <ion-button color="warning" size="small"
+                              [disabled]="log.status === 'Blocked' || log.status === 'Denied'"
+                              (click)="denyThreat(log, $event)"
+                              style="margin-right: 8px;">
+                     <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+                     {{ log.status === 'Denied' ? 'Threat Deny' : 'Deny Threat' }}
+                  </ion-button>
+
+                  <ion-button color="danger" size="small"
+                              [disabled]="log.status === 'Blocked'"
+                              (click)="blockThreat(log, $event)">
+                     <ion-icon name="shield-half-outline" slot="start"></ion-icon>
+                     {{ log.status === 'Blocked' ? 'Threat Block' : 'Block Threat' }}
+                  </ion-button>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🛡️ SYSTEM & NETWORK ACTIVITY (RIGHT) -->
+      <div class="log-section activity-section">
+        <div class="section-title">
+          <ion-icon name="list-outline"></ion-icon>
+          System & Network Activity
+        </div>
+
+        <div class="events-container">
+          <div class="table-header activity-header">
+            <ion-row>
+              <ion-col size="3">Time</ion-col>
+              <ion-col size="5">Activity Label</ion-col>
+              <ion-col size="4">Verdict/Status</ion-col>
+            </ion-row>
+          </div>
+
+          <div class="events-body">
+            <div *ngIf="systemEvents.length === 0" class="empty-state">
+              <p>Monitoring system logs...</p>
+            </div>
+
+            <div *ngFor="let event of systemEvents" class="table-row activity-row">
+              <ion-row style="align-items: center;">
+                <ion-col size="3" class="col-time">{{ event.time | date:'HH:mm:ss' }}</ion-col>
+                <ion-col size="5" class="col-label">{{ event.name.replace('System Event: ', '') }}</ion-col>
+                <ion-col size="4">
+                  <span class="severity-badge monitoring" [ngClass]="event.status.toLowerCase().replace(' ', '-')">{{ event.status }}</span>
+                </ion-col>
+              </ion-row>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </ion-content>

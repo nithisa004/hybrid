@@ -1,19 +1,24 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, AlertController, ToastController } from '@ionic/angular';
 import { ApiService } from '../../services/api.service';
 import { addIcons } from 'ionicons';
-import { 
-  scanOutline, 
-  shieldCheckmarkOutline, 
-  bugOutline, 
+import {
+  shieldCheckmarkOutline,
+  bugOutline,
   listOutline,
   checkmarkCircle,
   ellipse,
   checkmark,
   shieldHalfOutline,
   alertCircleOutline,
-  informationCircleOutline
+  informationCircleOutline,
+  pulseOutline,
+  wifiOutline,
+  pauseOutline,
+  playOutline,
+  documentTextOutline,
+  closeCircleOutline
 } from 'ionicons/icons';
 
 @Component({
@@ -23,64 +28,114 @@ import {
   templateUrl: './dashboard.page.html',
   styleUrls: ['./dashboard.page.scss']
 })
-export class DashboardPage implements OnInit {
+export class DashboardPage implements OnInit, OnDestroy {
 
-  logs: any[] = [];
+  threatLogs: any[] = [];
+  systemEvents: any[] = [];
   isScanning: boolean = false;
+  isPaused: boolean = false;
+
+  private sessionStart: string = new Date().toISOString();
+  private monitoringInterval: any;
 
   constructor(
     private api: ApiService,
     private alertController: AlertController,
     private toastController: ToastController
   ) {
-    addIcons({ 
-      scanOutline, 
-      shieldCheckmarkOutline, 
-      bugOutline, 
+    addIcons({
+      shieldCheckmarkOutline,
+      bugOutline,
       listOutline,
       checkmarkCircle,
       ellipse,
       checkmark,
       shieldHalfOutline,
       alertCircleOutline,
-      informationCircleOutline
+      informationCircleOutline,
+      pulseOutline,
+      wifiOutline,
+      pauseOutline,
+      playOutline,
+      documentTextOutline,
+      closeCircleOutline
     });
   }
 
   ngOnInit() {
-    this.loadLogs();
+    this.startMonitoring();
   }
 
-  getThreatsCount() {
-    return this.logs.filter(log => log.severity.toLowerCase() === 'high').length;
+  ngOnDestroy() {
+    this.stopMonitoring();
+  }
+
+  startMonitoring() {
+    this.stopMonitoring();
+    
+    // Initial Load
+    this.loadLogs();
+    this.runScan();
+
+    // Set 5-second interval for everything
+    this.monitoringInterval = setInterval(() => {
+      if (!this.isPaused) {
+        this.runScan();
+        this.loadLogs();
+      }
+    }, 5000);
+  }
+
+  stopMonitoring() {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+  }
+
+  togglePause() {
+    this.isPaused = !this.isPaused;
+    if (!this.isPaused) {
+      this.showToast('Monitoring Resumed', 'success');
+      this.runScan();
+      this.loadLogs();
+    } else {
+      this.showToast('Monitoring Paused', 'warning');
+    }
+  }
+
+  private runScan() {
+    this.isScanning = true;
+    this.api.detect({}).subscribe({
+      next: () => { 
+        this.isScanning = false; 
+      },
+      error: () => { this.isScanning = false; }
+    });
   }
 
   loadLogs() {
-    this.api.getLogs().subscribe(
-      (res: any) => {
-        this.logs = res.map((log: any) => ({
-          ...log,
-          open: false // Ensure open state is initialized
-        }));
+    this.api.getLogs(this.sessionStart).subscribe({
+      next: (res: any) => {
+        const allLogs = res.map((newLog: any) => {
+          const existingThreat = this.threatLogs.find(t => t.id === newLog.id);
+          const existingEvent = this.systemEvents.find(e => e.id === newLog.id);
+          const wasOpen = (existingThreat?.open || existingEvent?.open) || false;
+          return { ...newLog, open: wasOpen };
+        });
+
+        this.threatLogs = allLogs.filter((l: any) => l.severity !== 'Info');
+        this.systemEvents = allLogs.filter((l: any) => l.severity === 'Info');
       },
-      (err) => {
-        console.error("Error loading logs:", err);
-      }
-    );
+      error: (err) => console.error('Error loading logs:', err)
+    });
   }
 
-  runDetection() {
-    this.isScanning = true;
-    this.api.detect({}).subscribe(
-      () => {
-        this.isScanning = false;
-        this.loadLogs();
-      },
-      (err) => {
-        this.isScanning = false;
-        console.error("Detection error:", err);
-      }
-    );
+  getTotalEventsCount() {
+    return this.threatLogs.length + this.systemEvents.length;
+  }
+
+  getThreatsCount() {
+    return this.threatLogs.length;
   }
 
   toggle(log: any) {
@@ -88,31 +143,22 @@ export class DashboardPage implements OnInit {
   }
 
   async blockThreat(log: any, event: Event) {
-    event.stopPropagation(); // Prevent toggling the row
+    event.stopPropagation();
 
     const alert = await this.alertController.create({
-      header: 'Admin Verification',
-      message: 'Please enter the admin password to execute this secure action.',
+      header: '🔐 Admin Verification',
+      message: 'Enter the admin password to block this threat.',
       cssClass: 'admin-alert',
-      inputs: [
-        {
-          name: 'password',
-          type: 'password',
-          placeholder: 'Admin Password'
-        }
-      ],
+      inputs: [{ name: 'password', type: 'password', placeholder: 'Admin Password' }],
       buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        },
+        { text: 'Cancel', role: 'cancel' },
         {
           text: 'Verify & Block',
           handler: (data) => {
             if (data.password) {
               this.executeBlock(log, data.password);
             } else {
-               this.showToast('Password is required', 'danger');
+              this.showToast('Password is required', 'danger');
             }
           }
         }
@@ -123,28 +169,81 @@ export class DashboardPage implements OnInit {
   }
 
   private executeBlock(log: any, adminPassword: string) {
-    this.api.blockThreat(log.id, adminPassword).subscribe(
-      (res: any) => {
-        log.status = res.status;
+    this.api.blockThreat(log.id, adminPassword).subscribe({
+      next: (res: any) => {
+        log.status  = res.status;
         log.verdict = res.verdict;
-        log.assignee = res.assignee;
-        this.showToast('Threat blocked successfully.', 'success');
+        this.showToast(res.message || 'Threat Block', 'success');
       },
-      (err) => {
-        console.error("Error blocking threat:", err);
-        this.showToast(err.error?.error || 'Failed to block threat', 'danger');
+      error: () => {
+        this.showToast('Authentication failed', 'danger');
       }
-    );
+    });
   }
 
-  async showToast(message: string, color: string) {
+  async denyThreat(log: any, event: Event) {
+    event.stopPropagation();
+
+    const alert = await this.alertController.create({
+      header: '🔐 Admin Verification',
+      message: 'Enter the admin password to deny this threat (Mark as False Positive).',
+      cssClass: 'admin-alert',
+      inputs: [{ name: 'password', type: 'password', placeholder: 'Admin Password' }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Verify & Deny',
+          handler: (data) => {
+            if (data.password) {
+              this.executeDeny(log, data.password);
+            } else {
+              this.showToast('Password is required', 'danger');
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  private executeDeny(log: any, adminPassword: string) {
+    this.api.denyThreat(log.id, adminPassword).subscribe({
+      next: (res: any) => {
+        log.status = res.status;
+        log.verdict = res.verdict;
+        this.showToast(res.message || 'Threat Deny', 'success');
+      },
+      error: () => {
+        this.showToast('Authentication failed', 'danger');
+      }
+    });
+  }
+
+  private async showToast(message: string, color: string) {
     const toast = await this.toastController.create({
       message,
-      duration: 3000,
+      duration: 2000,
       color,
-      position: 'bottom',
-      icon: color === 'success' ? 'shield-checkmark-outline' : 'alert-circle-outline'
+      position: 'bottom'
     });
     toast.present();
+  }
+
+  generateReport() {
+    this.api.downloadReport().subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Weekly_Security_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        this.showToast('Security report generated successfully', 'success');
+      },
+      error: () => this.showToast('Failed to generate report', 'danger')
+    });
   }
 }
