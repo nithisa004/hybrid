@@ -27,6 +27,17 @@ class Log(models.Model):
     xgb_prediction = models.IntegerField(default=0)
     result = models.CharField(max_length=100, default='Normal')
 
+    # 🔒 FIREWALL BLOCKING FIELDS
+    blocked_ip = models.CharField(max_length=45, null=True, blank=True)  # IPv4/IPv6
+    blocked_at = models.DateTimeField(null=True, blank=True)
+    is_firewall_blocked = models.BooleanField(default=False)
+    block_status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('applied', 'Applied'), ('failed', 'Failed')],
+        default='pending'
+    )
+    firewall_rule_id = models.CharField(max_length=256, null=True, blank=True)
+
     def __str__(self):
         return f"{self.name} - {self.result} ({self.severity})"
 

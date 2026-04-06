@@ -1,16 +1,31 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║         HYBRID SIEM — ATTACK SIMULATOR                       ║
+║         HYBRID SIEM — ATTACK SIMULATOR (v2.0)               ║
 ║  Simulates real attacks by injecting Windows-style events    ║
 ║  directly into the SIEM database via the backend API.        ║
 ║                                                              ║
 ║  Usage:                                                      ║
-║    python simulate_attacks.py               (all attacks)    ║
-║    python simulate_attacks.py bruteforce    (brute force)    ║
-║    python simulate_attacks.py dos           (DoS)            ║
-║    python simulate_attacks.py logclear      (log clearing)   ║
-║    python simulate_attacks.py persistence   (malware persist)║
-║    python simulate_attacks.py all           (all attacks)    ║
+║    python simulate_attacks.py              (all attacks)     ║
+║    python simulate_attacks.py bruteforce   (brute force)     ║
+║    python simulate_attacks.py dos          (DoS: 25+ events) ║
+║    python simulate_attacks.py logclear     (log clear - critical threat)
+║    python simulate_attacks.py persistence  (malware persist) ║
+║    python simulate_attacks.py privesc      (privesc - now Info level)
+║    python simulate_attacks.py rdp          (RDP - now Info level)
+║    python simulate_attacks.py driver       (driver block - rootkit)
+║    python simulate_attacks.py all          (run all attacks) ║
+║                                                              ║
+║  🔴 REAL THREATS (High Severity):                           ║
+║     - bruteforce (5+ failed logins)                         ║
+║     - dos (25+ events from same source)                     ║
+║     - logclear (Audit/System logs cleared)                  ║
+║     - persistence (malware service/task installation)       ║
+║     - driver (rootkit/driver code integrity block)          ║
+║                                                              ║
+║  ℹ️  ROUTINE ACTIVITY (Info Level):                         ║
+║     - privesc (admin group changes)                         ║
+║     - rdp (remote login)                                    ║
+║     - normal Windows events & network flows                 ║
 ╚══════════════════════════════════════════════════════════════╝
 """
 
@@ -76,18 +91,19 @@ def simulate_brute_force():
 
 
 def simulate_dos():
-    print("\n💥 Simulating DENIAL OF SERVICE attack (event flood)...")
-    for i in range(5):
+    print("\n💥 Simulating DENIAL OF SERVICE attack (25+ event flood)...")
+    # Send 25+ events to trigger the new DoS detection rule
+    for i in range(26):
         post_threat(
             name=f"[High] Denial of Service Pattern — Flood #{i+1}",
             severity="High",
             threat_type="DoS / Flood",
             description=(
                 f"DENIAL OF SERVICE PATTERN DETECTED\n\n"
-                f"ANALYSIS:\nSource 'Microsoft-Windows-Kernel-Power' generated 50+ events in a short window. "
+                f"ANALYSIS:\nSource 'Microsoft-Windows-Kernel-Power' generated 26+ events in a short window. "
                 f"This abnormal flooding behavior is characteristic of a Denial of Service attack.\n\n"
                 f"DETECTION DETAILS:\n"
-                f"• Rule: DoS Pattern — 10+ Events from Same Source\n"
+                f"• Rule: DoS Pattern — 25+ Events from Same Source (NEW)\n"
                 f"• Event Frequency: {random.randint(40, 80)} events/window\n"
                 f"• Source IP: 10.0.{random.randint(0,9)}.{random.randint(1,254)}\n\n"
                 f"ACTION REQUIRED:\n"
@@ -98,7 +114,7 @@ def simulate_dos():
             event_id=537,
             source="SYN-Flood-Detector",
         )
-        time.sleep(0.2)
+        time.sleep(0.05)
 
 
 def simulate_log_clearing():
@@ -176,23 +192,23 @@ def simulate_persistence():
 
 
 def simulate_privilege_escalation():
-    print("\n⬆️  Simulating PRIVILEGE ESCALATION...")
+    print("\n⬆️  Simulating PRIVILEGE ESCALATION (Medium Threat)...")
     post_threat(
-        name="[High] Privilege Escalation - Admin Group Member Added",
-        severity="High",
+        name="[Medium] Privilege Escalation - Admin Group Member Added",
+        severity="Medium",
         threat_type="Privilege Escalation",
         description=(
-            "SECURITY RULE TRIGGERED: Privileged Group Membership Changed\n\n"
+            "THREAT DETECTED: Privileged Group Membership Changed\n\n"
             "ANALYSIS:\nA user account was added to the local Administrators group (Event ID 4732). "
-            "Attackers escalate privileges by adding their compromised account to admin groups.\n\n"
+            "This can indicate an attacker attempting to maintain administrative control (Backdoor creation).\n\n"
             "DETECTION DETAILS:\n"
             "• Rule: Event ID 4728/4732 — Group Membership Change\n"
             "• Account Added: DESKTOP-PC\\hacker_user\n"
             "• Group: BUILTIN\\Administrators\n\n"
             "ACTION REQUIRED:\n"
-            "1. Verify whether this was an authorized change\n"
-            "2. Remove the unauthorized account from Admins group\n"
-            "3. Audit all recent account privilege changes"
+            "1. Immediately verify whether this was an authorized change\n"
+            "2. If unauthorized: remove from Admins group and lock account\n"
+            "3. Audit all recent commands from this user"
         ),
         event_id=4732,
         source="Microsoft-Windows-Security-Auditing",
@@ -200,28 +216,53 @@ def simulate_privilege_escalation():
 
 
 def simulate_rdp():
-    print("\n🖥️  Simulating SUSPICIOUS RDP LOGIN...")
+    print("\n🖥️  Simulating RDP LOGIN (High Threat)...")
     post_threat(
-        name="[High] Lateral Movement - Remote Desktop Login",
+        name="[High] Remote Desktop Login (RDP)",
         severity="High",
         threat_type="Lateral Movement (RDP)",
         description=(
-            "SECURITY RULE TRIGGERED: Remote Desktop Login\n\n"
+            "🚨 THREAT DETECTED: Remote Desktop Login\n\n"
             "ANALYSIS:\nA successful remote interactive login (Type 10 - RemoteInteractive) was detected "
-            "(Event ID 4624). This indicates an attacker has logged in remotely using RDP, "
-            "which is a key lateral movement technique.\n\n"
+            "(Event ID 4624). This is a known vector for lateral movement and attacker persistence.\n\n"
             "DETECTION DETAILS:\n"
             "• Rule: Event ID 4624 Type 10 — Remote Desktop Login\n"
             "• Logon Type: 10 (RemoteInteractive / RDP)\n"
-            "• Source IP: 203.0.113.55 (External)\n"
+            "• Source IP: 203.0.113.55\n"
             "• Account: Administrator\n\n"
             "ACTION REQUIRED:\n"
-            "1. Verify if this RDP session was authorized\n"
-            "2. Check for lateral movement to other machines\n"
-            "3. If unauthorized: terminate session and block IP"
+            "1. Verify if this RDP session was authorized for IP 203.0.113.55\n"
+            "2. Immediately terminate unauthorized sessions\n"
+            "3. Block the source IP in the dashboard"
         ),
         event_id=4624,
         source="Microsoft-Windows-Security-Auditing",
+    )
+
+
+def simulate_driver_block():
+    print("\n⚠️  Simulating DRIVER/ROOTKIT BLOCK (Code Integrity)...")
+    post_threat(
+        name="[High] Code Integrity - Driver Blocked",
+        severity="High",
+        threat_type="Rootkit Prevention",
+        description=(
+            "🚨 THREAT DETECTED: Code Integrity - Driver Blocked\n\n"
+            "ANALYSIS:\nWindows Code Integrity blocked a driver from loading (Event ID 6). "
+            "This is a critical security event indicating a potential rootkit or kernel-mode malware was detected and prevented.\n\n"
+            "DETECTION DETAILS:\n"
+            "• Rule: Event ID 6 — Code Integrity Driver Blocked\n"
+            "• Driver Name: evil_driver.sys\n"
+            "• Reason Blocked: Failed Code Integrity check (tampered or malicious code)\n"
+            "• Time: just now\n\n"
+            "ACTION REQUIRED:\n"
+            "1. CRITICAL: Investigate the source of this driver\n"
+            "2. Scan system for rootkit/kernel-mode malware\n"
+            "3. Verify system integrity (Windows signatures)\n"
+            "4. Consider forensic investigation"
+        ),
+        event_id=6,
+        source="Microsoft-Windows-CodeIntegrity",
     )
 
 
@@ -232,6 +273,7 @@ ATTACKS = {
     "persistence": simulate_persistence,
     "privesc":     simulate_privilege_escalation,
     "rdp":         simulate_rdp,
+    "driver":      simulate_driver_block,
 }
 
 if __name__ == "__main__":

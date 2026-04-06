@@ -34,6 +34,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   systemEvents: any[] = [];
   isScanning: boolean = false;
   isPaused: boolean = false;
+  nmapAlertsCount: number = 0;  // Kali/Nmap realtime hits
 
   private sessionStart: string = new Date().toISOString();
   private monitoringInterval: any;
@@ -72,18 +73,19 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   startMonitoring() {
     this.stopMonitoring();
-    
+
     // Initial Load
     this.loadLogs();
     this.runScan();
 
-    // Set 5-second interval for everything
+    // Set 2-second interval for everything
     this.monitoringInterval = setInterval(() => {
       if (!this.isPaused) {
         this.runScan();
+        this.runNmapScan();
         this.loadLogs();
       }
-    }, 5000);
+    }, 2000);
   }
 
   stopMonitoring() {
@@ -106,11 +108,32 @@ export class DashboardPage implements OnInit, OnDestroy {
   private runScan() {
     this.isScanning = true;
     this.api.detect({}).subscribe({
-      next: () => { 
-        this.isScanning = false; 
+      next: () => {
+        this.isScanning = false;
       },
       error: () => { this.isScanning = false; }
     });
+  }
+
+  /** Poll the Nmap sensor endpoint — runs in parallel with runScan() */
+  private runNmapScan() {
+    this.api.detectNmap({}).subscribe({
+      next: (res: any) => {
+        const found = res?.threats_found ?? 0;
+        if (found > 0) {
+          this.nmapAlertsCount += found;
+          this.showToast(
+            `🚨 ${found} Nmap/Kali attack(s) detected from ${res.threats[0]?.source}!`,
+            'danger'
+          );
+        }
+      },
+      error: () => { /* sensor errors are non-fatal */ }
+    });
+  }
+
+  getKaliThreatsCount(): number {
+    return this.nmapAlertsCount;
   }
 
   loadLogs() {
@@ -171,7 +194,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   private executeBlock(log: any, adminPassword: string) {
     this.api.blockThreat(log.id, adminPassword).subscribe({
       next: (res: any) => {
-        log.status  = res.status;
+        log.status = res.status;
         log.verdict = res.verdict;
         this.showToast(res.message || 'Threat Block', 'success');
       },

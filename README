@@ -23,15 +23,15 @@ Checklist
  User Guide / Viva Script
 
 
- where to put dataset file
+where to put dataset file
  hybrid/Autoencoder/ae_train.csv
  hybrid/Autoencoder/ae_test.csv
-  hybrid/Autoencoder/X_test_scaled.csv
-   hybrid/Autoencoder/y_test.csv
+ hybrid/Autoencoder/X_test_scaled.csv
+ hybrid/Autoencoder/y_test.csv
  hybrid/XGBoost/X_test_scaled.csv
  hybrid/XGBoost/X_train_scaled.csv
-  hybrid/XGBoost/y_train.csv
-   hybrid/XGBoost/y_test.csv
+ hybrid/XGBoost/y_train.csv
+ hybrid/XGBoost/y_test.csv
 
    download the dataset from G-Drive
    https://drive.google.com/drive/folders/1Cz2PQ6AJT__PB7lf6TO3t8I_xEFr9v3B?usp=sharing
@@ -41,7 +41,15 @@ py simulate_attacks.py bruteforce	Simulates a Brute Force login attack (10 faile
 py simulate_attacks.py dos	Simulates a Denial of Service (DoS) flood
 py simulate_attacks.py logclear	Simulates an Anti-Forensics event (Security log cleared)
 py simulate_attacks.py persistence	Simulates a Malware Persistence attempt (New Service + Task)
-py simulate_attacks.py all	Runs all attack simulations sequentially
+py simulate_attacks.py              (all attacks)     
+py simulate_attacks.py rdp          (RDP - now Info level)
+py simulate_attacks.py driver       (driver block - rootkit)
+
+kali
+
+ping 192.168.56.1 
+nmap -sS 192.168.56.1
+
 
 To check firewall rules:
 

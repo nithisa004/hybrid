@@ -13,6 +13,16 @@ export class ApiService {
         return this.http.post(`${this.baseUrl}/detect/`, payload);
     }
 
+    /** POST → runs one Nmap detection cycle, returns threats[] */
+    detectNmap(payload: any = {}) {
+        return this.http.post(`${this.baseUrl}/detect/nmap/`, payload);
+    }
+
+    /** GET → returns sensor stats (diagnostics) */
+    getNmapStats() {
+        return this.http.get(`${this.baseUrl}/detect/nmap/`);
+    }
+
     // Pass ?since= to show only current-session logs (starts at 0 on each page load)
     getLogs(since?: string) {
         const url = since
