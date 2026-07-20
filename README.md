@@ -31,8 +31,8 @@ You have two options to feed data to your SIEM from the `detection` folder:
     cd d:\hybrid\detection
     py .\realtime_detection.py
     ```
-*  cd d:\hybrid\detection && python realtime_detection.py *
-    ```
+*   cd d:\hybrid\detection && python realtime_detection.py 
+  
 
 
 ### Bonus: Manual Attack Simulation
