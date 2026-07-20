@@ -25,7 +25,7 @@ ionic serve
 3. Terminal Three: Security Sensors (Run as Administrator)
 You have two options to feed data to your SIEM from the `detection` folder:
 
-*   **Option A: Unified Sensor (NIC + OS Logs)**
+*   **Unified Sensor (NIC + OS Logs)**
     *Best for full-spectrum monitoring.*
     ```powershell
     cd d:\hybrid\detection
